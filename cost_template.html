@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Koszt Spotkania</title>
+</head>
+<body>
+    <h1>Koszt Spotkania</h1>
+    <p>Średnia pensja (koszt pracodawcy): {{ average_salary }} PLN/miesiąc</p>
+    <label for="meeting-title">Tytuł spotkania:</label>
+    <input type="text" id="meeting-title" required>
+    <label for="people-count">Ilość osób:</label>
+    <input type="number" id="people-count" required>
+    <button id="start-btn">Start</button>
+    <button id="stop-btn" disabled>Stop</button>
+    <button id="reset-btn">Reset</button>
+    <p>Skumulowany koszt: <span id="cost">{{ meeting_cost }}</span> PLN</p>
+
+    <h2>Historia spotkań:</h2>
+    <table id="meeting-history">
+        <thead>
+            <tr>
+                <th>Tytuł spotkania</th>
+                <th>Koszt</th>
+            </tr>
+        </thead>
+        <tbody id="history-body">
+            {% for meeting in meeting_history %}
+            <tr>
+                <td>{{ meeting.title }}</td>
+                <td>{{ meeting.cost }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        let isRunning = false;
+
+        $('#start-btn').click(function() {
+            let peopleCount = parseInt($('#people-count').val());
+            let meetingTitle = $('#meeting-title').val();
+            if (peopleCount > 0 && meetingTitle) {
+                $.ajax({
+                    type: 'POST',
+                    url: '/start_meeting',
+                    data: { people_count: peopleCount, meeting_title: meetingTitle },
+                    success: function() {
+                        isRunning = true;
+                        $('#start-btn').prop('disabled', true);
+                        $('#stop-btn').prop('disabled', false);
+                        $('#people-count').prop('disabled', true);
+                        $('#meeting-title').prop('disabled', true);
+                    }
+                });
+            } else {
+                alert('Podaj ilość osób i tytuł spotkania!');
+            }
+        });
+
+        $('#stop-btn').click(function() {
+            $.ajax({
+                type: 'POST',
+                url: '/stop_meeting',
+                success: function() {
+                    isRunning = false;
+                    $('#start-btn').prop('disabled', false);
+                    $('#stop-btn').prop('disabled', true);
+                    $('#people-count').prop('disabled', false);
+                    $('#meeting-title').prop('disabled', false);
+                }
+            });
+        });
+
+        $('#reset-btn').click(function() {
+            let meetingTitle = $('#meeting-title').val();
+            $.ajax({
+                type: 'POST',
+                url: '/reset_meeting',
+                data: { meeting_title: meetingTitle },
+                success: function() {
+                    isRunning = false;
+                    $('#start-btn').prop('disabled', false);
+                    $('#stop-btn').prop('disabled', true);
+                    $('#people-count').prop('disabled', false);
+                    $('#meeting-title').prop('disabled', false);
+                    $('#cost').html(0);
+                    updateHistory();
+                }
+            });
+        });
+
+        function updateCost() {
+            $.ajax({
+                type: 'GET',
+                url: '/get_cost',
+                success: function(data) {
+                    $('#cost').html(data);
+                    if(data>0) {
+                        $('#start-btn').prop('disabled', true);
+                    }
+                }
+            });
+        }
+
+        function updateHistory() {
+            $.ajax({
+                type: 'GET',
+                url: '/get_history',
+                success: function(data) {
+                    let historyBody = $('#history-body');
+                    historyBody.empty();
+                    $.each(data, function(index, meeting) {
+                        historyBody.append('<tr><td>' + meeting.title + '</td><td>' + meeting.cost + '</td></tr>');
+                    });
+                }
+            });
+        }
+
+        setInterval(updateCost, 3000); // Aktualizuj co 3 sec
+        updateHistory(); // Wyświetl historię po załadowaniu strony
+    </script>
+</body>
+</html>
